@@ -51,7 +51,11 @@ Note: other environments may also work.
 - numpy==1.22.2 (numpy should be lower than 1.24, recommend for numpy==1.23 or 1.22)
 - mmcv==2.2.0, mmengine==0.10.5
 - timm, deepspeed, pycocotools, lvis, jsonlines, fairscale, nltk, peft, wandb
-
+### 3-1 Additional packages required
+- shapely
+- terminaltables
+- scikit-learn==1.7.2
+- scipy==1.13.1
 ### 4 Data Preparation (GroundingCap-1M)
 
 ```

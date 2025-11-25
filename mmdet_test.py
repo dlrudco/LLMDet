@@ -133,7 +133,6 @@ def main():
         # build customized runner from the registry
         # if 'runner_type' is set in the cfg
         runner = RUNNERS.build(cfg)
-
     # add `DumpResults` dummy metric
     if args.out is not None:
         assert args.out.endswith(('.pkl', '.pickle')), \

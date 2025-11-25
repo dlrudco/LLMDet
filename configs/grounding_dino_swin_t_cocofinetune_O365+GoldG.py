@@ -125,7 +125,7 @@ model = dict(
         type='GroundingDINOHead',
         num_classes=256,
         sync_cls_avg_factor=True,
-        contrastive_cfg=dict(max_text_len=256, log_scale='auto', bias=True),
+        contrastive_cfg=dict(max_text_len=256, log_scale=1/256, bias=True),
         loss_cls=dict(
             type='FocalLoss',
             use_sigmoid=True,
@@ -284,15 +284,9 @@ train_dataloader = dict(
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     batch_sampler=dict(type='AspectRatioBatchSampler'),
-    dataset=dict(type='ConcatDataset', datasets=[
-        coco2017_train_dataset,
-        flickr30k_dataset,
-        gqa_dataset,
-        caption_dataset,
-        v3det_dataset,
-    ]))
+    dataset=coco2017_train_dataset)
 
-dataset_type = 'LVISV1Dataset'
+dataset_type = 'CocoDataset'
 data_root = '../grounding_data/coco/'
 
 val_dataloader = dict(
@@ -301,8 +295,8 @@ val_dataloader = dict(
     dataset=dict(
         data_root=data_root,
         type=dataset_type,
-        ann_file='annotations/lvis_v1_minival_inserted_image_name.json',
-        data_prefix=dict(img=''),
+        ann_file='annotations/instances_val2017.json',
+        data_prefix=dict(img='val2017/'),
         pipeline=test_pipeline, 
         return_classes=True))
 test_dataloader = val_dataloader
@@ -310,15 +304,15 @@ test_dataloader = val_dataloader
 # numpy < 1.24.0
 val_evaluator = dict(
     _delete_=True,
-    type='LVISFixedAPMetric',
+    type='CocoMetric',
     ann_file=data_root +
-    'annotations/lvis_v1_minival_inserted_image_name.json')
+    'annotations/instances_val2017.json')
 test_evaluator = val_evaluator
 
 optim_wrapper = dict(
     _delete_=True,
     type='OptimWrapper',
-    optimizer=dict(type='AdamW', lr=0.0001,
+    optimizer=dict(type='AdamW', lr=0.00001,
                    weight_decay=0.0001),  # bs=16 0.0001
     clip_grad=dict(max_norm=0.1, norm_type=2),
     paramwise_cfg=dict(
@@ -330,12 +324,12 @@ optim_wrapper = dict(
         }))
 
 
-max_iter = 150000
+max_iter = 15000
 train_cfg = dict(
     _delete_=True,
     type='IterBasedTrainLoop',
     max_iters=max_iter,
-    val_interval=30000)
+    val_interval=3000)
 
 param_scheduler = [
     dict(type='LinearLR', start_factor=0.001, by_epoch=False, begin=0, end=1000),
@@ -344,7 +338,7 @@ param_scheduler = [
         begin=0,
         end=max_iter,
         by_epoch=False,
-        milestones=[120000, 140000],
+        milestones=[12000, 14000],
         gamma=0.1)
 ]
 
@@ -381,5 +375,5 @@ env_cfg = dict(
     dist_cfg=dict(backend='nccl', timeout=36000), # 36000s = 10h
 )
 
-load_from = '/home/spalab/paper/LLMDet/mm_gdino/grounding_dino_swin-t_pretrain_obj365_goldg_grit9m_v3det_20231204_095047-b448804b.pth'
+load_from = '/home/spalab/paper/LLMDet/mm_gdino/grounding_dino_swin-t_pretrain_obj365_goldg_20231122_132602-4ea751ce.pth'
 

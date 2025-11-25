@@ -968,11 +968,13 @@ class GroundingDINO(DINO):
                         selected_queries.append(features)
                         query_lens.append(len(features))
                     
-                    selected_boxes = torch.cat(selected_boxes).unsqueeze(1) # (total_queries, 1, 4)
-                    selected_queries = torch.cat(selected_queries).unsqueeze(1)
-                    if len(selected_queries) == 0:
-                        losses[f'd{i}.loss_lmm_region'] = torch.sum(head_inputs_dict['hidden_states'][-i]) * 0
-                        continue
+                    total_query_lens = sum(query_lens)
+                    # if len(selected_boxes) == 0:
+                    selected_boxes = torch.zeros((total_query_lens, 4), device=batch_inputs.device).unsqueeze(1) # (total_queries, 1, 4)
+                    selected_queries = torch.zeros((total_query_lens, head_inputs_dict['hidden_states'].shape[-1]), device=batch_inputs.device).unsqueeze(1)
+                    # else:
+                    #     selected_boxes = torch.cat(selected_boxes).unsqueeze(1) # (total_queries, 1, 4)
+                    #     selected_queries = torch.cat(selected_queries).unsqueeze(1)
 
                     cross_attention_input = None
                     if self.use_lmm_cross_attn:
@@ -1002,10 +1004,10 @@ class GroundingDINO(DINO):
                             'reference_points_input': reference_points_input,
                             'half': False,
                         }
-
+                    
                     features = self.region_connector([selected_queries])
                     features = features + self.region_connector.forward_pos(gen_sineembed_for_position(selected_boxes)).half()
-                    
+
                     # prepare LMM input
                     region_conversations = []
                     for data_samples in batch_data_samples:
@@ -1044,6 +1046,10 @@ class GroundingDINO(DINO):
                     self.lmm.eval()
                     with autocast(enabled=True):
                         loss_lmm = self.lmm.detection_forward(**lmm_imput_dict)
+                    
+                    # if len(selected_boxes) == 0:
+                    #     losses[f'd{i}.loss_lmm_region'] = torch.sum(head_inputs_dict['hidden_states'][-i]) * 0
+                    # else:
                     losses[f'd{i}.loss_lmm_region'] = loss_lmm.loss * self.lmm_region_loss_weight
 
             if self.use_p5_input:
