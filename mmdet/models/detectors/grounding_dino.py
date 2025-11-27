@@ -371,6 +371,7 @@ class GroundingDINO(DINO):
                  use_constrast_conv=False,
                  fsdp=False,
                  num_region_caption=0,
+                 use_region_aware=True,
                  use_p5_input=True,
                  use_p4_input=True,
                  use_query_input=False,
@@ -382,6 +383,7 @@ class GroundingDINO(DINO):
                  use_autocast=False,
                  **kwargs) -> None:
 
+        self.use_region_aware = use_region_aware
         self.language_model_cfg = language_model
         self._special_tokens = '. '
         self.use_autocast = use_autocast
@@ -946,7 +948,7 @@ class GroundingDINO(DINO):
         
         if self.lmm is not None:
             # region-level description
-            if self.num_region_caption > 0:
+            if self.num_region_caption > 0 and self.use_region_aware:
                 for i in range(1, self.lmm_layers + 1):
                     matching_bbox_preds = all_layers_matching_bbox_preds[-i].clone().detach() # [bs, num_query, 4]
                     matching_bbox_preds = bbox_cxcywh_to_xyxy(matching_bbox_preds)
