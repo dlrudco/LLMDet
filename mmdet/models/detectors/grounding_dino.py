@@ -473,7 +473,7 @@ class GroundingDINO(DINO):
             # torch.nn.init.zeros_(vision_projector.pos_proj.bias)
             if self.use_p5_input or self.use_p4_input:
                 self.connector = vision_projector
-            if self.num_region_caption > 0 or self.use_query_input:
+            if (self.num_region_caption > 0 or self.use_query_input) and self.use_region_aware:
                 self.region_connector = copy.deepcopy(vision_projector)
             
             yv, xv = torch.meshgrid([torch.range(0, 1, 1/self.feature_map_size), torch.range(0, 1, 1/self.feature_map_size)])

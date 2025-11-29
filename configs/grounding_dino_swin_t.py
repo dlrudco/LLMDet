@@ -29,13 +29,13 @@ model = dict(
     freeze_lm=False,
     use_plora=False,
     use_lora=True,
-    use_lmm_cross_attn=True,
+    use_lmm_cross_attn=False,
     num_lmm_new_layers=6,
     lmm_new_layer_insert_type='all',
     feature_map_size=27,
-    num_region_caption=num_region_caption,
+    num_region_caption=0,
     use_p5_input=True,
-    use_p4_input=True,
+    use_p4_input=False,
     use_query_input=False,
     use_image_level_cross_attn=False,
     mini_query=False,
@@ -287,9 +287,9 @@ train_dataloader = dict(
     dataset=dict(type='ConcatDataset', datasets=[
         coco2017_train_dataset,
         flickr30k_dataset,
-        gqa_dataset,
-        caption_dataset,
-        v3det_dataset,
+        # gqa_dataset,
+        # caption_dataset,
+        # v3det_dataset,
     ]))
 
 dataset_type = 'LVISV1Dataset'
@@ -381,5 +381,5 @@ env_cfg = dict(
     dist_cfg=dict(backend='nccl', timeout=36000), # 36000s = 10h
 )
 
-load_from = '/home/spalab/paper/LLMDet/mm_gdino/grounding_dino_swin-t_pretrain_obj365_goldg_grit9m_v3det_20231204_095047-b448804b.pth'
+load_from = 'mm_gdino/grounding_dino_swin-t_pretrain_obj365_goldg_grit9m_v3det_20231204_095047-b448804b.pth'
 
