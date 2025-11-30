@@ -358,6 +358,7 @@ class GroundingDINO(DINO):
                  freeze_backbone=False,
                  freeze_lm=False,
                  language_model=None,
+                 qformer_model=None,
                  use_dn=True,
                  use_plora=False,
                  use_lora=False,
@@ -372,6 +373,7 @@ class GroundingDINO(DINO):
                  fsdp=False,
                  num_region_caption=0,
                  use_region_aware=True,
+                 use_qformer=False,
                  use_p5_input=True,
                  use_p4_input=True,
                  use_query_input=False,
@@ -382,9 +384,10 @@ class GroundingDINO(DINO):
                  *args,
                  use_autocast=False,
                  **kwargs) -> None:
-
+        self.use_qformer = use_qformer
         self.use_region_aware = use_region_aware
         self.language_model_cfg = language_model
+        self.qformer_model_cfg = qformer_model
         self._special_tokens = '. '
         self.use_autocast = use_autocast
         self.lmm = lmm
@@ -426,7 +429,7 @@ class GroundingDINO(DINO):
                 self.lmm = LlavaQwenForCausalLM.from_pretrained(lmm)
             else:
                 self.lmm = LlavaQwenForCausalLM.from_pretrained(lmm).half()
-            self.lmm = checkpoint_wrapper(self.lmm)
+            # self.lmm = checkpoint_wrapper(self.lmm)
             self.lmm.requires_grad_(False)
             self.lmm.config.use_cache = False
 
@@ -471,10 +474,12 @@ class GroundingDINO(DINO):
                 vision_projector.load_state_dict(get_w(mm_projector_weights, lmm_connector_prefix))
             # torch.nn.init.zeros_(vision_projector.pos_proj.weight)
             # torch.nn.init.zeros_(vision_projector.pos_proj.bias)
-            if self.use_p5_input or self.use_p4_input:
-                self.connector = vision_projector
-            if (self.num_region_caption > 0 or self.use_query_input) and self.use_region_aware:
-                self.region_connector = copy.deepcopy(vision_projector)
+            if not self.use_qformer:
+                if self.use_p5_input or self.use_p4_input:
+                    self.connector = vision_projector
+                if (self.num_region_caption > 0 or self.use_query_input) and self.use_region_aware:
+                    self.region_connector = copy.deepcopy(vision_projector)
+            
             
             yv, xv = torch.meshgrid([torch.range(0, 1, 1/self.feature_map_size), torch.range(0, 1, 1/self.feature_map_size)])
             grid = torch.stack((xv, yv), 2).view(self.feature_map_size+1, self.feature_map_size+1, 2)
@@ -487,6 +492,20 @@ class GroundingDINO(DINO):
                 self.p5_grid_box = torch.cat([grid[:-1, :-1], grid[1:, 1:]], dim=-1).flatten(0, 1)
 
             self.img_idx = 0
+
+    # def init_Qformer(self, num_query_token=32, vision_width=256, cross_attention_freq=1):
+    #     from .Qformer import BertConfig, BertLMHeadModel
+    #     encoder_config = BertConfig.from_pretrained("bert-base-uncased")
+    #     encoder_config.encoder_width = vision_width
+    #     # insert cross-attention layer every other block
+    #     encoder_config.add_cross_attention = True
+    #     encoder_config.cross_attention_freq = cross_attention_freq
+    #     encoder_config.query_length = num_query_token
+    #     Qformer = BertLMHeadModel.from_pretrained(
+    #         "bert-base-uncased", config=encoder_config
+    #     )
+        
+    #     return Qformer.bert, query_tokens, 
 
 
     def _init_layers(self) -> None:
@@ -513,6 +532,30 @@ class GroundingDINO(DINO):
             self.language_model.language_backbone.body.language_dim,
             self.embed_dims,
             bias=True)
+
+        if self.use_qformer:
+            # from .Qformer import BertConfig, BertLMHeadModel
+            # encoder_config = BertConfig.from_pretrained("bert-base-uncased")
+            # encoder_config.encoder_width = 256
+            # # insert cross-attention layer every other block
+            # encoder_config.add_cross_attention = True
+            # encoder_config.cross_attention_freq = 1
+            # encoder_config.query_length = 32
+            # # qformer, self.qformer_queries, self.qformer_mapper = self.init_Qformer()
+            # self.qformer_mapper = nn.Linear(768, 896)
+            # self.qformer_queries = nn.Parameter(
+            # torch.zeros(1, 32, 768), requires_grad=True
+            # )
+            # self.qformer_queries.data.normal_(mean=0.0, std=encoder_config.initializer_range)
+            # self.qformer_model_cfg.config=encoder_config
+            # qformer = MODELS.build(self.qformer_model_cfg)
+            # self.qformer = qformer.bert
+            self.k_mapper= nn.Linear(256,896)
+            self.v_mapper= nn.Linear(256,896)
+            self.qformer = nn.MultiheadAttention(896, 8)
+            self.qformer_queries = nn.Parameter(
+            torch.zeros(1, 32, 896), requires_grad=True
+            )
 
     def init_weights(self) -> None:
         """Initialize weights for Transformer and other components."""
@@ -1091,6 +1134,7 @@ class GroundingDINO(DINO):
                 )
 
                 image_queries = []
+                dummies = []
                 query_masks = []
                 cross_attention_input = None
                         
@@ -1098,14 +1142,34 @@ class GroundingDINO(DINO):
                     for i in range(len(decoder_inputs_dict['memory'])):
                         p5_feature_map = decoder_inputs_dict['memory'][i][decoder_inputs_dict['level_start_index'][-2]: decoder_inputs_dict['level_start_index'][-1]]
                         H, W = int(decoder_inputs_dict['spatial_shapes'][-2][0].data), int(decoder_inputs_dict['spatial_shapes'][-2][1].data)
-                        p5_feature_map = p5_feature_map.reshape(H, W, decoder_inputs_dict['memory'].shape[-1]).permute(2, 0, 1)
-                        p5_feature_map = p5_feature_map[:, :int(torch.round(H * decoder_inputs_dict['valid_ratios'][i, -2, 1])), :int(torch.round(W * decoder_inputs_dict['valid_ratios'][i, -2, 0]))]
-                        p5_feature_map = F.interpolate(p5_feature_map[None], size=(self.feature_map_size, self.feature_map_size), mode='bilinear')[0]
-                        # if flips[i]:
-                        #     p5_feature_map = p5_feature_map.flip(-1)
-                        p5_feature_map = self.connector([p5_feature_map.permute(1, 2, 0)]).flatten(0, 1)
-                        p5_feature_map = p5_feature_map + self.connector.forward_pos(gen_sineembed_for_position_2d(self.grid_box.to(p5_feature_map.device)))
+                        
+                        if self.use_qformer:
+                            # p5_feature_map = self.p5_qformer(p5_feature_map)
+                            # q_out = self.qformer(
+                            #     query_embeds=self.qformer_queries,
+                            #     encoder_hidden_states=p5_feature_map.unsqueeze(0),
+                            #     encoder_attention_mask=torch.ones(p5_feature_map.unsqueeze(0).size()[:-1], dtype=torch.long).to(p5_feature_map.device),
+                            #     return_dict=True
+                            # )
+                            # dummies.append(q_out.last_hidden_state.mean())
+                            # p5_feature_map = self.qformer_mapper(q_out.last_hidden_state).squeeze(0)
+
+                            k = self.k_mapper(p5_feature_map)
+                            v = self.v_mapper(p5_feature_map)
+                            p5_feature_map  = self.qformer(self.qformer_queries.permute(1,0,2), k.unsqueeze(1), v.unsqueeze(1))[0]
+                            p5_feature_map = p5_feature_map.squeeze(1)
+                            
+                        else:
+                            p5_feature_map = p5_feature_map.reshape(H, W, decoder_inputs_dict['memory'].shape[-1]).permute(2, 0, 1)
+                            p5_feature_map = p5_feature_map[:, :int(torch.round(H * decoder_inputs_dict['valid_ratios'][i, -2, 1])), :int(torch.round(W * decoder_inputs_dict['valid_ratios'][i, -2, 0]))]
+                            p5_feature_map = F.interpolate(p5_feature_map[None], size=(self.feature_map_size, self.feature_map_size), mode='bilinear')[0]
+                            # if flips[i]:
+                            #     p5_feature_map = p5_feature_map.flip(-1)
+                            p5_feature_map = self.connector([p5_feature_map.permute(1, 2, 0)]).flatten(0, 1)
+                            p5_feature_map = p5_feature_map + self.connector.forward_pos(gen_sineembed_for_position_2d(self.grid_box.to(p5_feature_map.device)))
+                        
                         image_queries.append(p5_feature_map.half())
+                        
                         query_masks.append(torch.ones((len(image_queries[-1])), device=p5_feature_map.device, dtype=torch.bool))
 
                 else:
@@ -1159,10 +1223,11 @@ class GroundingDINO(DINO):
                 lmm_imput_dict['image_queries'] = image_queries
                 lmm_imput_dict['query_masks'] = query_masks
                 lmm_imput_dict['cross_attention_input'] = cross_attention_input
+                
                 self.lmm.eval()
                 with autocast(enabled=True):
                     loss_lmm = self.lmm.detection_forward(**lmm_imput_dict)
-                losses['loss_lmm_image'] = loss_lmm.loss * self.lmm_image_loss_weight
+                losses['loss_lmm_image'] = loss_lmm.loss * self.lmm_image_loss_weight + 0*sum(dummies)
         return losses
 
     def predict(self, batch_inputs, batch_data_samples, rescale: bool = True):
