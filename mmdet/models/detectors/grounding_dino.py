@@ -552,9 +552,9 @@ class GroundingDINO(DINO):
             # self.qformer = qformer.bert
             self.k_mapper= nn.Linear(256,896)
             self.v_mapper= nn.Linear(256,896)
-            self.qformer = nn.MultiheadAttention(896, 8)
+            self.qformer = nn.MultiheadAttention(896, 4)
             self.qformer_queries = nn.Parameter(
-            torch.zeros(1, 32, 896), requires_grad=True
+            torch.zeros(1, 8, 896), requires_grad=True
             )
 
     def init_weights(self) -> None:
@@ -896,6 +896,7 @@ class GroundingDINO(DINO):
 
     def loss(self, batch_inputs: Tensor,
              batch_data_samples: SampleList) -> Union[dict, list]:
+        breakpoint()
         text_prompts = [
             data_samples.text for data_samples in batch_data_samples
         ]
@@ -914,6 +915,7 @@ class GroundingDINO(DINO):
             positive_map_dicts = []
             for token_positive, text_prompt, gt_label in zip(
                     tokens_positive, text_prompts, gt_labels):
+                
                 tokenized = self.language_model.tokenizer(
                     [text_prompt],
                     padding='max_length'
