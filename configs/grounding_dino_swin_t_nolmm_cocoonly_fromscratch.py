@@ -19,13 +19,13 @@ model = dict(
     num_queries=900,
     with_box_refine=True,
     as_two_stage=True,
-    lmm=lmm_path,
+    lmm=None,
     lmm_max_token_length=lmm_max_token_length,
     lmm_region_loss_weight=1.0,
     lmm_image_loss_weight=1.0,
-    lmm_connector='../huggingface/my_llava-onevision-qwen2-0.5b-ov-2/mm_projector2.bin',
+    lmm_connector=None,
     lmm_connector_prefix='mm_projector',
-    freeze_backbone=True,
+    freeze_backbone=False,
     freeze_lm=False,
     use_plora=False,
     use_lora=True,
@@ -34,7 +34,7 @@ model = dict(
     lmm_new_layer_insert_type='all',
     feature_map_size=27,
     num_region_caption=0,
-    use_qformer=True,
+    use_qformer=False,
     use_p5_input=True,
     use_p4_input=False,
     use_query_input=False,
@@ -206,7 +206,7 @@ test_pipeline = [
 coco2017_train_dataset = dict(
     type='ODVGDataset',
     data_root='../grounding_data/coco/',
-    ann_file='annotations/instances_train2017_vg_merged6.jsonl',
+    ann_file='annotations/instances_train2017_cocobase.jsonl',
     data_prefix=dict(img='train2017'),
     filter_cfg=dict(filter_empty_gt=False),
     pipeline=train_pipeline,
@@ -325,23 +325,23 @@ optim_wrapper = dict(
     optimizer=dict(type='AdamW', lr=0.0001,
                    weight_decay=0.0001),  # bs=16 0.0001
     clip_grad=dict(max_norm=0.1, norm_type=2),
-    paramwise_cfg=dict(
-        custom_keys={
-            'absolute_pos_embed': dict(decay_mult=0.),
-            'backbone': dict(lr_mult=0.1),
-            'language_model': dict(lr_mult=0.1),
-            # 'qformer': dict(lr_mult=1.0),
-            # 'lmm': dict(lr_mult=0.1),
-        })
+    # paramwise_cfg=dict(
+    #     custom_keys={
+    #         'absolute_pos_embed': dict(decay_mult=0.),
+    #         'backbone': dict(lr_mult=0.1),
+    #         'language_model': dict(lr_mult=0.1),
+    #         # 'qformer': dict(lr_mult=1.0),
+    #         # 'lmm': dict(lr_mult=0.1),
+    #     })
     )
 
 
-max_iter = 150000
+max_iter = 30000
 train_cfg = dict(
     _delete_=True,
     type='IterBasedTrainLoop',
     max_iters=max_iter,
-    val_interval=10000)
+    val_interval=2000)
 
 param_scheduler = [
     dict(type='LinearLR', start_factor=0.001, by_epoch=False, begin=0, end=1000),
@@ -350,7 +350,7 @@ param_scheduler = [
         begin=0,
         end=max_iter,
         by_epoch=False,
-        milestones=[120000, 140000],
+        milestones=[20000, 25000],
         gamma=0.1)
 ]
 
@@ -361,14 +361,14 @@ visualizer = dict(
             type='WandbVisBackend',
             init_kwargs=dict(
                 project='LLMDet',
-                name='ImageLevelOnly-COCOOnly',
+                name='NOLMM-COCOOnly',
             )
         )
     ]
 )
 
 default_hooks = dict(
-    checkpoint=dict(by_epoch=False, interval=30000, max_keep_ckpts=30),
+    checkpoint=dict(by_epoch=False, interval=2000, max_keep_ckpts=30),
     visualization=dict(type='GroundingVisualizationHook'),
     logger=dict(type='LoggerHook', interval=100))
 log_processor = dict(by_epoch=False)
@@ -400,5 +400,5 @@ env_cfg = dict(
     dist_cfg=dict(backend='nccl', timeout=36000), # 36000s = 10h
 )
 
-load_from = 'mm_gdino/grounding_dino_swin-t_pretrain_obj365_goldg_grit9m_v3det_20231204_095047-b448804b.pth'
+load_from = None
 

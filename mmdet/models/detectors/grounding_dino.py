@@ -422,6 +422,7 @@ class GroundingDINO(DINO):
             state_dict = torch.load(pretrain_ckpt, 'cpu')['state_dict']
             msg = self.load_state_dict(state_dict, False)
             print(msg)
+        # breakpoint()
         if lmm is not None:
             from llava.model.language_model.llava_qwen import LlavaQwenForCausalLM
             from llava.model.multimodal_projector.builder import vision_projector_with_pos_proj
@@ -533,7 +534,7 @@ class GroundingDINO(DINO):
             self.embed_dims,
             bias=True)
 
-        if self.use_qformer:
+        if hasattr(self, 'lmm') and self.use_qformer:
             # from .Qformer import BertConfig, BertLMHeadModel
             # encoder_config = BertConfig.from_pretrained("bert-base-uncased")
             # encoder_config.encoder_width = 256
@@ -896,7 +897,6 @@ class GroundingDINO(DINO):
 
     def loss(self, batch_inputs: Tensor,
              batch_data_samples: SampleList) -> Union[dict, list]:
-        breakpoint()
         text_prompts = [
             data_samples.text for data_samples in batch_data_samples
         ]
@@ -1237,6 +1237,8 @@ class GroundingDINO(DINO):
         enhanced_text_prompts = []
         tokens_positives = []
         is_rec_tasks = []
+        
+
         for data_samples in batch_data_samples:
             text_prompts.append(data_samples.text)
             if 'caption_prompt' in data_samples:

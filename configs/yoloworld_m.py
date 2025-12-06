@@ -15,143 +15,21 @@ clean_caption=True
 randomness=dict(seed=624982218)
 
 model = dict(
-    type='GroundingDINO',
-    num_queries=900,
-    with_box_refine=True,
-    as_two_stage=True,
+    type='YOLOWorldDetector',
     lmm=lmm_path,
     lmm_max_token_length=lmm_max_token_length,
     lmm_region_loss_weight=1.0,
     lmm_image_loss_weight=1.0,
     lmm_connector='../huggingface/my_llava-onevision-qwen2-0.5b-ov-2/mm_projector2.bin',
     lmm_connector_prefix='mm_projector',
-    freeze_backbone=True,
-    freeze_lm=False,
-    use_plora=False,
-    use_lora=True,
     use_lmm_cross_attn=False,
     num_lmm_new_layers=6,
     lmm_new_layer_insert_type='all',
     feature_map_size=27,
-    num_region_caption=0,
-    use_qformer=True,
-    use_p5_input=True,
-    use_p4_input=False,
-    use_query_input=False,
-    use_image_level_cross_attn=False,
-    mini_query=False,
     lora_r=128, 
     lora_alpha=256, 
     lora_dropout=0,
-    data_preprocessor=dict(
-        type='DetDataPreprocessor',
-        mean=[123.675, 116.28, 103.53],
-        std=[58.395, 57.12, 57.375],
-        bgr_to_rgb=True,
-        pad_mask=False,
-    ),
-    language_model=dict(
-        type='BertModel',
-        name=lang_model_name,
-        max_tokens=256,
-        pad_to_max=False,
-        use_sub_sentence_represent=True,
-        special_tokens_list=['[CLS]', '[SEP]', '.', '?'],
-        add_pooling_layer=False,
-    ),
-    qformer_model=dict(
-        type='BertLMHeadModel',
-    ),
-    backbone=dict(
-        type='SwinTransformer',
-        embed_dims=96,
-        depths=[2, 2, 6, 2],
-        num_heads=[3, 6, 12, 24],
-        window_size=7,
-        mlp_ratio=4,
-        qkv_bias=True,
-        qk_scale=None,
-        drop_rate=0.,
-        attn_drop_rate=0.,
-        drop_path_rate=0.2,
-        patch_norm=True,
-        out_indices=(1, 2, 3),
-        with_cp=True,
-        convert_weights=True,
-        frozen_stages=-1,
-        init_cfg=dict(type='Pretrained', checkpoint=pretrained)),
-    neck=dict(
-        type='ChannelMapper',
-        in_channels=[192, 384, 768],
-        kernel_size=1,
-        out_channels=256,
-        act_cfg=None,
-        bias=True,
-        norm_cfg=dict(type='GN', num_groups=32),
-        num_outs=4),
-    encoder=dict(
-        num_layers=6,
-        num_cp=6,
-        # visual layer config
-        layer_cfg=dict(
-            self_attn_cfg=dict(embed_dims=256, num_levels=4, dropout=0.0),
-            ffn_cfg=dict(
-                embed_dims=256, feedforward_channels=2048, ffn_drop=0.0)),
-        # text layer config
-        text_layer_cfg=dict(
-            self_attn_cfg=dict(num_heads=4, embed_dims=256, dropout=0.0),
-            ffn_cfg=dict(
-                embed_dims=256, feedforward_channels=1024, ffn_drop=0.0)),
-        # fusion layer config
-        fusion_layer_cfg=dict(
-            v_dim=256,
-            l_dim=256,
-            embed_dim=1024,
-            num_heads=4,
-            init_values=1e-4),
-    ),
-    decoder=dict(
-        num_layers=6,
-        return_intermediate=True,
-        layer_cfg=dict(
-            # query self attention layer
-            self_attn_cfg=dict(embed_dims=256, num_heads=8, dropout=0.0),
-            # cross attention layer query to text
-            cross_attn_text_cfg=dict(embed_dims=256, num_heads=8, dropout=0.0),
-            # cross attention layer query to image
-            cross_attn_cfg=dict(embed_dims=256, num_heads=8, dropout=0.0),
-            ffn_cfg=dict(
-                embed_dims=256, feedforward_channels=2048, ffn_drop=0.0)),
-        post_norm_cfg=None),
-    positional_encoding=dict(
-        num_feats=128, normalize=True, offset=0.0, temperature=20),
-    bbox_head=dict(
-        type='GroundingDINOHead',
-        num_classes=256,
-        sync_cls_avg_factor=True,
-        contrastive_cfg=dict(max_text_len=256, log_scale='auto', bias=True),
-        loss_cls=dict(
-            type='FocalLoss',
-            use_sigmoid=True,
-            gamma=2.0,
-            alpha=0.25,
-            loss_weight=1.0),  # 2.0 in DeformDETR
-        loss_bbox=dict(type='L1Loss', loss_weight=5.0)),
-    dn_cfg=dict(  # TODO: Move to model.train_cfg ?
-        label_noise_scale=0.5,
-        box_noise_scale=1.0,  # 0.4 for DN-DETR
-        group_cfg=dict(dynamic=True, num_groups=None,
-                       num_dn_queries=100)),  # TODO: half num_dn_queries
-    # training and testing settings
-    train_cfg=dict(
-        assigner=dict(
-            type='HungarianAssigner',
-            match_costs=[
-                dict(type='BinaryFocalLossCost', weight=2.0),
-                dict(type='BBoxL1Cost', weight=5.0, box_format='xywh'),
-                dict(type='IoUCost', iou_mode='giou', weight=2.0)
-            ])),
-    test_cfg=dict(max_per_img=300, chunked_size=40))
+    )
 
 
 
@@ -283,20 +161,20 @@ v3det_dataset = dict(
 
 train_dataloader = dict(
     _delete_=True,
-    batch_size=2,
+    batch_size=1,
     num_workers=2,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     batch_sampler=dict(type='AspectRatioBatchSampler'),
     dataset=dict(type='ConcatDataset', datasets=[
         coco2017_train_dataset,
-        # flickr30k_dataset,
+        flickr30k_dataset,
         # gqa_dataset,
         # caption_dataset,
         # v3det_dataset,
     ]))
 
-dataset_type = 'CocoDataset'
+dataset_type = 'LVISV1Dataset'
 data_root = '../grounding_data/coco/'
 
 val_dataloader = dict(
@@ -305,8 +183,8 @@ val_dataloader = dict(
     dataset=dict(
         data_root=data_root,
         type=dataset_type,
-        ann_file='annotations/instances_val2017.json',
-        data_prefix=dict(img='val2017/'),
+        ann_file='annotations/lvis_v1_minival_inserted_image_name.json',
+        data_prefix=dict(img=''),
         pipeline=test_pipeline, 
         return_classes=True))
 test_dataloader = val_dataloader
@@ -314,9 +192,9 @@ test_dataloader = val_dataloader
 # numpy < 1.24.0
 val_evaluator = dict(
     _delete_=True,
-    type='CocoMetric',
+    type='LVISFixedAPMetric',
     ann_file=data_root +
-    'annotations/instances_val2017.json')
+    'annotations/lvis_v1_minival_inserted_image_name.json')
 test_evaluator = val_evaluator
 
 optim_wrapper = dict(
@@ -330,10 +208,8 @@ optim_wrapper = dict(
             'absolute_pos_embed': dict(decay_mult=0.),
             'backbone': dict(lr_mult=0.1),
             'language_model': dict(lr_mult=0.1),
-            # 'qformer': dict(lr_mult=1.0),
             # 'lmm': dict(lr_mult=0.1),
-        })
-    )
+        }))
 
 
 max_iter = 150000
@@ -341,7 +217,7 @@ train_cfg = dict(
     _delete_=True,
     type='IterBasedTrainLoop',
     max_iters=max_iter,
-    val_interval=10000)
+    val_interval=30000)
 
 param_scheduler = [
     dict(type='LinearLR', start_factor=0.001, by_epoch=False, begin=0, end=1000),
@@ -353,19 +229,6 @@ param_scheduler = [
         milestones=[120000, 140000],
         gamma=0.1)
 ]
-
-visualizer = dict(
-    type='Visualizer',
-    vis_backends=[
-        dict(
-            type='WandbVisBackend',
-            init_kwargs=dict(
-                project='LLMDet',
-                name='ImageLevelOnly-COCOOnly',
-            )
-        )
-    ]
-)
 
 default_hooks = dict(
     checkpoint=dict(by_epoch=False, interval=30000, max_keep_ckpts=30),

@@ -206,7 +206,7 @@ test_pipeline = [
 coco2017_train_dataset = dict(
     type='ODVGDataset',
     data_root='../grounding_data/coco/',
-    ann_file='annotations/instances_train2017_vg_merged6.jsonl',
+    ann_file='annotations/instances_train2017_cocobase.jsonl',
     data_prefix=dict(img='train2017'),
     filter_cfg=dict(filter_empty_gt=False),
     pipeline=train_pipeline,
@@ -336,12 +336,12 @@ optim_wrapper = dict(
     )
 
 
-max_iter = 150000
+max_iter = 30000
 train_cfg = dict(
     _delete_=True,
     type='IterBasedTrainLoop',
     max_iters=max_iter,
-    val_interval=10000)
+    val_interval=2000)
 
 param_scheduler = [
     dict(type='LinearLR', start_factor=0.001, by_epoch=False, begin=0, end=1000),
@@ -350,7 +350,7 @@ param_scheduler = [
         begin=0,
         end=max_iter,
         by_epoch=False,
-        milestones=[120000, 140000],
+        milestones=[20000, 25000],
         gamma=0.1)
 ]
 
@@ -368,7 +368,7 @@ visualizer = dict(
 )
 
 default_hooks = dict(
-    checkpoint=dict(by_epoch=False, interval=30000, max_keep_ckpts=30),
+    checkpoint=dict(by_epoch=False, interval=2000, max_keep_ckpts=30),
     visualization=dict(type='GroundingVisualizationHook'),
     logger=dict(type='LoggerHook', interval=100))
 log_processor = dict(by_epoch=False)
