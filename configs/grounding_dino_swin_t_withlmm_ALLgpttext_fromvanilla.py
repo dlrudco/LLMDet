@@ -368,7 +368,7 @@ visualizer = dict(
 )
 
 default_hooks = dict(
-    checkpoint=dict(by_epoch=False, interval=2000, max_keep_ckpts=30),
+    checkpoint=dict(by_epoch=False, interval=10000, max_keep_ckpts=15),
     visualization=dict(type='GroundingVisualizationHook'),
     logger=dict(type='LoggerHook', interval=100))
 log_processor = dict(by_epoch=False)
