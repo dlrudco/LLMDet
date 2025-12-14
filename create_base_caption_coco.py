@@ -4,7 +4,7 @@ import os
 import re
 from tqdm import tqdm
 # 경로는 상황에 맞게 바꿔줘
-base_path = '/host_mnt/sdb/kclee/OpenVoca/grounding_data/coco/annotations'
+base_path = '/mnt/sdd/grounding_data/coco/annotations'
 CAPTION_JSON_PATH = os.path.join(base_path, "captions_train2017.json")   # orig_captions가 들어있는 json 파일
 INPUT_JSONL_PATH  = os.path.join(base_path, "instances_train2017_vg_merged6.jsonl")  # 원본 jsonl
 OUTPUT_JSONL_PATH = os.path.join(base_path, "instances_train2017_cocobase.jsonl")  # 결과 jsonl
