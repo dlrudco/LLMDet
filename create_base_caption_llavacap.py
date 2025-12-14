@@ -4,35 +4,9 @@ import os
 import re
 from tqdm import tqdm
 # 경로는 상황에 맞게 바꿔줘
-base_path = '/mnt/sdd/grounding_data/coco/annotations'
-CAPTION_JSON_PATH = os.path.join(base_path, "captions_train2017.json")   # orig_captions가 들어있는 json 파일
-INPUT_JSONL_PATH  = os.path.join(base_path, "instances_train2017_vg_merged6.jsonl")  # 원본 jsonl
-OUTPUT_JSONL_PATH = os.path.join(base_path, "instances_train2017_cocobase.jsonl")  # 결과 jsonl
-
-def build_imageid_to_caption_map(caption_json_path):
-    with open(caption_json_path, "r", encoding="utf-8") as f:
-        orig_captions = json.load(f)
-
-    imageid_to_captions = defaultdict(list)
-
-    # orig_captions['images'] 원소 형태:
-    # {'image_id': 203564, 'id': 37, 'caption': 'A bicycle replica ...'}
-    for item in orig_captions["annotations"]:
-        image_id = item["image_id"]
-        caption = item["caption"].strip()
-        if not caption.endswith('.'):
-            caption += '.'  # 문장 끝에 마침표가 없으면 추가
-        imageid_to_captions[image_id].append(caption)
-
-    # 하나의 image_id에 있는 여러 캡션들을 하나의 문자열로 합치기
-    # 합치는 방식은 필요에 따라 바꿔도 됨 (예: " ".join([...]) 대신 " ".join([...]))
-    imageid_to_caption_str = {}
-    for image_id, caps in imageid_to_captions.items():
-        # 간단히 공백으로 이어 붙임 (문장 여러 개가 이어진 하나의 텍스트)
-        joined = " ".join(caps)
-        imageid_to_caption_str[image_id] = joined
-
-    return imageid_to_caption_str
+base_path = '/mnt/sdd/grounding_data/llava_cap'
+INPUT_JSONL_PATH  = os.path.join(base_path, "LLaVA-ReCap-558K_tag_box_vg7.jsonl")  # 원본 jsonl
+OUTPUT_JSONL_PATH = os.path.join(base_path, "LLaVA-ReCap-558K_tag_box_base.jsonl")  # 결과 jsonl
 
 def filename_to_image_id(filename: str) -> int:
     """
@@ -48,7 +22,6 @@ def filename_to_image_id(filename: str) -> int:
 def replace_gpt_captions_in_jsonl(
     input_jsonl_path: str,
     output_jsonl_path: str,
-    imageid_to_caption: dict
 ):
     """
     jsonl 파일을 한 줄씩 읽어서 conversations 안의 GPT 응답을
@@ -79,7 +52,7 @@ def replace_gpt_captions_in_jsonl(
                 continue
 
             # 해당 image_id의 캡션 문자열 가져오기
-            caption_text = imageid_to_caption.get(image_id, None)
+            caption_text = data["grounding"]["caption"]
             if caption_text is None:
                 breakpoint()
                 # 캡션이 없으면 원본 유지 (원하면 빈 문자열로 교체하도록 바꿔도 됨)
@@ -93,7 +66,7 @@ def replace_gpt_captions_in_jsonl(
                 if conv.get("from") == "gpt":
                     conv["value"] = caption_text
                 elif conv.get("from") == "human":
-                    conv["value"] = "<image>\\nGenerate several captions to explain the image in detail."
+                    conv["value"] = "<image>\\nGenerate grounding captions to detect all elements in this image."
 
             data["conversations"] = convs
 
@@ -102,12 +75,8 @@ def replace_gpt_captions_in_jsonl(
 
 
 if __name__ == "__main__":
-    # 1) image_id -> caption 문자열 매핑 만들기
-    imageid_to_caption = build_imageid_to_caption_map(CAPTION_JSON_PATH)
-
     # 2) jsonl을 돌면서 gpt 캡션을 교체하고 새 jsonl로 저장
     replace_gpt_captions_in_jsonl(
         INPUT_JSONL_PATH,
         OUTPUT_JSONL_PATH,
-        imageid_to_caption
     )
