@@ -555,7 +555,7 @@ class GroundingDINO(DINO):
             self.v_mapper= nn.Linear(256,896)
             self.qformer = nn.MultiheadAttention(896, 4)
             self.qformer_queries = nn.Parameter(
-            torch.zeros(1, 8, 896), requires_grad=True
+            torch.zeros(1, 64, 896), requires_grad=True
             )
 
     def init_weights(self) -> None:

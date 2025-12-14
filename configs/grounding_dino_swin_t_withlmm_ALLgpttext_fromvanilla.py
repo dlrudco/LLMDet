@@ -25,7 +25,7 @@ model = dict(
     lmm_image_loss_weight=1.0,
     lmm_connector='../huggingface/my_llava-onevision-qwen2-0.5b-ov-2/mm_projector2.bin',
     lmm_connector_prefix='mm_projector',
-    freeze_backbone=False,
+    freeze_backbone=True,
     freeze_lm=False,
     use_plora=False,
     use_lora=False,
@@ -322,7 +322,7 @@ test_evaluator = val_evaluator
 optim_wrapper = dict(
     _delete_=True,
     type='OptimWrapper',
-    optimizer=dict(type='AdamW', lr=0.0001,
+    optimizer=dict(type='AdamW', lr=0.00005,
                    weight_decay=0.0001),  # bs=16 0.0001 
     clip_grad=dict(max_norm=0.5, norm_type=2),
     # paramwise_cfg=dict(
@@ -361,7 +361,7 @@ visualizer = dict(
             type='WandbVisBackend',
             init_kwargs=dict(
                 project='LLMDet',
-                name='WithLMM-COCOGPT-vanilla',
+                name='WithLMM-COCOGPT-vanilla-Q64',
             )
         )
     ]
